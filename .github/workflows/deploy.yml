@@ -5,8 +5,8 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: ap-south-1
-  S3_BUCKET: aws-lambda-deploy-somesh-123
+  AWS_REGION: us-east-2
+  S3_BUCKET: aws-lambda-deploy-somesh
 
 jobs:
   deploy:
@@ -37,11 +37,11 @@ jobs:
 
     - name: Delete failed stack if exists
       run: |
-        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name user-api-stack --region ap-south-1 --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name user-api-stack --region us-east-2 --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
         if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
           echo "Deleting failed stack..."
-          aws cloudformation delete-stack --stack-name user-api-stack --region ap-south-1
-          aws cloudformation wait stack-delete-complete --stack-name user-api-stack --region ap-south-1
+          aws cloudformation delete-stack --stack-name user-api-stack --region us-east-2
+          aws cloudformation wait stack-delete-complete --stack-name user-api-stack --region us-east-2
         fi
       
 
