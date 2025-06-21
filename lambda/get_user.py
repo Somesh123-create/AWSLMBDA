@@ -7,6 +7,7 @@ table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
     user_id = event['pathParameters']['id']
+    print(f"Retrieving user with ID: {user_id}")
     response = table.get_item(Key={'id': user_id})
     item = response.get('Item')
     if item:
