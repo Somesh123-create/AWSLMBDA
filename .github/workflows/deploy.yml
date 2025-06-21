@@ -7,6 +7,7 @@ on:
 env:
   AWS_REGION: us-east-2
   STACK_NAME: user-api-stack
+  ENV_SUFFIX: dev
 
 jobs:
   deploy:
@@ -23,12 +24,13 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Zip Lambda Functions
+    - name: Zip All Lambda Functions
       run: |
         mkdir -p zipped
-        zip -j zipped/create_user.zip lambda/create_user.py
-        zip -j zipped/get_user.zip lambda/get_user.py
-        zip -j zipped/delete_user.zip lambda/delete_user.py
+        for file in lambda/*.py; do
+          fname=$(basename "$file" .py)
+          zip -j "zipped/${fname}.zip" "$file"
+        done
 
     - name: Delete failed stack if exists
       run: |
@@ -45,21 +47,17 @@ jobs:
           --stack-name ${{ env.STACK_NAME }} \
           --capabilities CAPABILITY_NAMED_IAM \
           --no-fail-on-empty-changeset \
-          --parameter-overrides Environment=dev
+          --parameter-overrides Environment=${{ env.ENV_SUFFIX }}
 
-    - name: Update Lambda Code
+    - name: Update All Lambda Functions
       run: |
-        aws lambda update-function-code \
-          --function-name CreateUser-dev \
-          --zip-file fileb://zipped/create_user.zip \
-          --region ${{ env.AWS_REGION }}
-
-        aws lambda update-function-code \
-          --function-name GetUser-dev \
-          --zip-file fileb://zipped/get_user.zip \
-          --region ${{ env.AWS_REGION }}
-
-        aws lambda update-function-code \
-          --function-name DeleteUser-dev \
-          --zip-file fileb://zipped/delete_user.zip \
-          --region ${{ env.AWS_REGION }}
+        for zipfile in zipped/*.zip; do
+          fname=$(basename "$zipfile" .zip)
+          function_name="${fname}-${{ env.ENV_SUFFIX }}"
+          echo "Updating Lambda: $function_name"
+          
+          aws lambda update-function-code \
+            --function-name "$function_name" \
+            --zip-file "fileb://$zipfile" \
+            --region ${{ env.AWS_REGION }}
+        done
