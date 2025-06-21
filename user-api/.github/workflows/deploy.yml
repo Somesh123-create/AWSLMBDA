@@ -1,0 +1,43 @@
+name: Deploy to AWS Lambda with CloudFormation
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-south-1
+  S3_BUCKET: aws-lambda-deploy-somesh-123
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Package and Upload Lambda Functions
+      run: |
+        mkdir -p zipped
+        zip -j zipped/create_user.zip lambda/create_user.py
+        zip -j zipped/get_user.zip lambda/get_user.py
+        zip -j zipped/delete_user.zip lambda/delete_user.py
+
+        aws s3 cp zipped/create_user.zip s3://${{ env.S3_BUCKET }}/lambda/create_user.zip
+        aws s3 cp zipped/get_user.zip s3://${{ env.S3_BUCKET }}/lambda/get_user.zip
+        aws s3 cp zipped/delete_user.zip s3://${{ env.S3_BUCKET }}/lambda/delete_user.zip
+
+    - name: Deploy CloudFormation Stack
+      run: |
+        aws cloudformation deploy \
+          --template-file template.yaml \
+          --stack-name user-api-stack \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --parameter-overrides Environment=dev

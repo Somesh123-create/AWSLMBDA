@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: User API - 3 Lambda functions with API Gateway and DynamoDB
+Description: User API with Lambda, API Gateway, and DynamoDB
 
 Parameters:
   Environment:
@@ -8,7 +8,6 @@ Parameters:
 
 Resources:
 
-  #### DynamoDB Table ####
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -19,10 +18,8 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
 
-  #### IAM Role ####
-  LambdaExecutionRole:
+  LambdaRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "UserApiLambdaRole-${Environment}"
@@ -34,15 +31,14 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: DynamoAccess
+        - PolicyName: DynamoDBAccess
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: ["dynamodb:*"]
+                Action: dynamodb:*
                 Resource: "*"
 
-  #### Lambda Functions ####
   CreateUserFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -50,9 +46,9 @@ Resources:
       Runtime: python3.11
       Handler: create_user.lambda_handler
       Code:
-        S3Bucket: your-s3-bucket
+        S3Bucket: aws-lambda-deploy-somesh-123
         S3Key: lambda/create_user.zip
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
@@ -64,9 +60,9 @@ Resources:
       Runtime: python3.11
       Handler: get_user.lambda_handler
       Code:
-        S3Bucket: your-s3-bucket
+        S3Bucket: aws-lambda-deploy-somesh-123
         S3Key: lambda/get_user.zip
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
@@ -78,15 +74,14 @@ Resources:
       Runtime: python3.11
       Handler: delete_user.lambda_handler
       Code:
-        S3Bucket: your-s3-bucket
+        S3Bucket: aws-lambda-deploy-somesh-123
         S3Key: lambda/delete_user.zip
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
 
-  #### API Gateway ####
-  Api:
+  ApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub "UserApi-${Environment}"
@@ -94,54 +89,51 @@ Resources:
   UserResource:
     Type: AWS::ApiGateway::Resource
     Properties:
-      RestApiId: !Ref Api
-      ParentId: !GetAtt Api.RootResourceId
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
       PathPart: user
 
   UserIdResource:
     Type: AWS::ApiGateway::Resource
     Properties:
-      RestApiId: !Ref Api
+      RestApiId: !Ref ApiGateway
       ParentId: !Ref UserResource
       PathPart: "{id}"
 
-  ## POST /user
   PostUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
-      RestApiId: !Ref Api
+      RestApiId: !Ref ApiGateway
       ResourceId: !Ref UserResource
       HttpMethod: POST
       AuthorizationType: NONE
       Integration:
-        IntegrationHttpMethod: POST
         Type: AWS_PROXY
+        IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateUserFunction.Arn}/invocations"
 
-  ## GET /user/{id}
   GetUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
-      RestApiId: !Ref Api
+      RestApiId: !Ref ApiGateway
       ResourceId: !Ref UserIdResource
       HttpMethod: GET
       AuthorizationType: NONE
       Integration:
-        IntegrationHttpMethod: POST
         Type: AWS_PROXY
+        IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserFunction.Arn}/invocations"
 
-  ## DELETE /user/{id}
   DeleteUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
-      RestApiId: !Ref Api
+      RestApiId: !Ref ApiGateway
       ResourceId: !Ref UserIdResource
       HttpMethod: DELETE
       AuthorizationType: NONE
       Integration:
-        IntegrationHttpMethod: POST
         Type: AWS_PROXY
+        IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUserFunction.Arn}/invocations"
 
   Deployment:
@@ -151,35 +143,18 @@ Resources:
       - GetUserMethod
       - DeleteUserMethod
     Properties:
-      RestApiId: !Ref Api
+      RestApiId: !Ref ApiGateway
       StageName: !Ref Environment
 
-  #### Lambda Permissions ####
-  AllowInvokeCreate:
+  LambdaInvokePermissions:
     Type: AWS::Lambda::Permission
     Properties:
+      Action: lambda:InvokeFunction
       FunctionName: !Ref CreateUserFunction
-      Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/POST/user"
-
-  AllowInvokeGet:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref GetUserFunction
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/GET/user/*"
-
-  AllowInvokeDelete:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref DeleteUserFunction
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/DELETE/user/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
 
 Outputs:
-  ApiUrl:
-    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/user"
-    Description: "Base URL for the User API"
+  ApiEndpoint:
+    Description: "Base URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/user"

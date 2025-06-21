@@ -3,8 +3,8 @@ import boto3
 import os
 import uuid
 
-dynamo = boto3.resource('dynamodb')
-table = dynamo.Table(os.environ['TABLE_NAME'])
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
     body = json.loads(event['body'])
@@ -15,4 +15,7 @@ def lambda_handler(event, context):
         'email': body.get('email'),
     }
     table.put_item(Item=item)
-    return {"statusCode": 201, "body": json.dumps(item)}
+    return {
+        'statusCode': 201,
+        'body': json.dumps(item)
+    }
