@@ -9,6 +9,7 @@ table = dynamodb.Table(os.environ['TABLE_NAME'])
 def lambda_handler(event, context):
     body = json.loads(event['body'])
     user_id = str(uuid.uuid4())
+    print(f"Creating user with ID: {user_id}")
     item = {
         'id': user_id,
         'name': body.get('name'),
