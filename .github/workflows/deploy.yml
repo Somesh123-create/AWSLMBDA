@@ -50,16 +50,16 @@ jobs:
     - name: Update Lambda Code
       run: |
         aws lambda update-function-code \
-          --function-name createUserFunction \
+          --function-name CreateUser-dev \
           --zip-file fileb://zipped/create_user.zip \
           --region ${{ env.AWS_REGION }}
 
         aws lambda update-function-code \
-          --function-name getUserFunction \
+          --function-name GetUser-dev \
           --zip-file fileb://zipped/get_user.zip \
           --region ${{ env.AWS_REGION }}
 
         aws lambda update-function-code \
-          --function-name deleteUserFunction \
+          --function-name DeleteUser-dev \
           --zip-file fileb://zipped/delete_user.zip \
           --region ${{ env.AWS_REGION }}
