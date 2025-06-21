@@ -49,8 +49,9 @@ Resources:
       Runtime: python3.11
       Handler: create_user.lambda_handler
       Code:
-        S3Bucket: aws-lambda-deploy-somesh
-        S3Key: lambda/create_user.zip
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
@@ -63,8 +64,9 @@ Resources:
       Runtime: python3.11
       Handler: get_user.lambda_handler
       Code:
-        S3Bucket: aws-lambda-deploy-somesh
-        S3Key: lambda/get_user.zip
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
@@ -77,8 +79,9 @@ Resources:
       Runtime: python3.11
       Handler: delete_user.lambda_handler
       Code:
-        S3Bucket: aws-lambda-deploy-somesh
-        S3Key: lambda/delete_user.zip
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
@@ -175,6 +178,6 @@ Resources:
 
 
 Outputs:
-  ApiEndpoint:
+  ApiBaseURL:
     Description: "Base URL"
-    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/user"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"

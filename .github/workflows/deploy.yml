@@ -1,4 +1,4 @@
-name: Deploy to AWS Lambda with CloudFormation
+name: Deploy to AWS Lambda without S3
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: us-east-2
-  S3_BUCKET: aws-lambda-deploy-somesh
+  STACK_NAME: user-api-stack
 
 jobs:
   deploy:
@@ -23,32 +23,43 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Package and Upload Lambda Functions
+    - name: Zip Lambda Functions
       run: |
         mkdir -p zipped
         zip -j zipped/create_user.zip lambda/create_user.py
         zip -j zipped/get_user.zip lambda/get_user.py
         zip -j zipped/delete_user.zip lambda/delete_user.py
 
-        aws s3 cp zipped/create_user.zip s3://${{ env.S3_BUCKET }}/lambda/create_user.zip
-        aws s3 cp zipped/get_user.zip s3://${{ env.S3_BUCKET }}/lambda/get_user.zip
-        aws s3 cp zipped/delete_user.zip s3://${{ env.S3_BUCKET }}/lambda/delete_user.zip
-    
-
     - name: Delete failed stack if exists
       run: |
-        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name user-api-stack --region us-east-2 --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
         if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
-          echo "Deleting failed stack..."
-          aws cloudformation delete-stack --stack-name user-api-stack --region us-east-2
-          aws cloudformation wait stack-delete-complete --stack-name user-api-stack --region us-east-2
+          aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }}
+          aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }}
         fi
-      
 
-    - name: Deploy CloudFormation Stack
+    - name: Deploy Infrastructure via CloudFormation
       run: |
         aws cloudformation deploy \
           --template-file template.yaml \
-          --stack-name user-api-stack \
+          --stack-name ${{ env.STACK_NAME }} \
           --capabilities CAPABILITY_NAMED_IAM \
+          --no-fail-on-empty-changeset \
           --parameter-overrides Environment=dev
+
+    - name: Update Lambda Code
+      run: |
+        aws lambda update-function-code \
+          --function-name createUserFunction \
+          --zip-file fileb://zipped/create_user.zip \
+          --region ${{ env.AWS_REGION }}
+
+        aws lambda update-function-code \
+          --function-name getUserFunction \
+          --zip-file fileb://zipped/get_user.zip \
+          --region ${{ env.AWS_REGION }}
+
+        aws lambda update-function-code \
+          --function-name deleteUserFunction \
+          --zip-file fileb://zipped/delete_user.zip \
+          --region ${{ env.AWS_REGION }}
