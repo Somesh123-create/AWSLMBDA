@@ -7,6 +7,7 @@ on:
 env:
   AWS_REGION: us-east-2
   S3_BUCKET: aws-lambda-deploy-somesh
+  STACK_NAME: user-api-stack
 
 jobs:
   deploy:
@@ -25,30 +26,37 @@ jobs:
 
     - name: Package and Upload Lambda Functions
       run: |
+        set -e
         mkdir -p zipped
         zip -j zipped/create_user.zip lambda/create_user.py
         zip -j zipped/get_user.zip lambda/get_user.py
         zip -j zipped/delete_user.zip lambda/delete_user.py
 
+        echo "Uploading Lambda ZIPs to S3..."
         aws s3 cp zipped/create_user.zip s3://${{ env.S3_BUCKET }}/lambda/create_user.zip
         aws s3 cp zipped/get_user.zip s3://${{ env.S3_BUCKET }}/lambda/get_user.zip
         aws s3 cp zipped/delete_user.zip s3://${{ env.S3_BUCKET }}/lambda/delete_user.zip
-    
+
+    - name: List Zipped Contents
+      run: ls -lh zipped
 
     - name: Delete failed stack if exists
       run: |
-        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name user-api-stack --region us-east-2 --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --region ${{ env.AWS_REGION }} --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
         if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
           echo "Deleting failed stack..."
-          aws cloudformation delete-stack --stack-name user-api-stack --region us-east-2
-          aws cloudformation wait stack-delete-complete --stack-name user-api-stack --region us-east-2
+          aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }} --region ${{ env.AWS_REGION }}
+          aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }} --region ${{ env.AWS_REGION }}
+        else
+          echo "No failed stack to delete. Status: $STACK_STATUS"
         fi
-      
 
     - name: Deploy CloudFormation Stack
       run: |
+        echo "Deploying CloudFormation stack..."
         aws cloudformation deploy \
           --template-file template.yaml \
-          --stack-name user-api-stack \
+          --stack-name ${{ env.STACK_NAME }} \
           --capabilities CAPABILITY_NAMED_IAM \
+          --no-fail-on-empty-changeset \
           --parameter-overrides Environment=dev
