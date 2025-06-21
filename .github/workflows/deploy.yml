@@ -33,6 +33,17 @@ jobs:
         aws s3 cp zipped/create_user.zip s3://${{ env.S3_BUCKET }}/lambda/create_user.zip
         aws s3 cp zipped/get_user.zip s3://${{ env.S3_BUCKET }}/lambda/get_user.zip
         aws s3 cp zipped/delete_user.zip s3://${{ env.S3_BUCKET }}/lambda/delete_user.zip
+    
+
+    - name: Delete failed stack if exists
+      run: |
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name user-api-stack --region ap-south-1 --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
+        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+          echo "Deleting failed stack..."
+          aws cloudformation delete-stack --stack-name user-api-stack --region ap-south-1
+          aws cloudformation wait stack-delete-complete --stack-name user-api-stack --region ap-south-1
+        fi
+      
 
     - name: Deploy CloudFormation Stack
       run: |
