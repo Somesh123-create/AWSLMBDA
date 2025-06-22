@@ -8,39 +8,34 @@ from botocore.exceptions import BotoCoreError
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+sqs = boto3.client('sqs')
+QUEUE_URL = os.environ['QUEUE_URL']
+
 def lambda_handler(event: dict, _context: dict) -> dict:
     """Handle bulk user creation from API Gateway event."""
     try:
         body = json.loads(event['body'])
         users = body.get('users', [])
-        if not isinstance(users, list):
-            return {
-                'statusCode': 400,
-                'body': json.dumps({'error': "'users' must be a list"})
+        # Validate and add IDs
+        valid_users = [
+            {
+                "id": str(uuid.uuid4()),
+                "name": user["name"],
+                "email": user["email"]
             }
+            for user in users
+            if isinstance(user.get("name"), str) and "@" in user.get("email", "")
+        ]
 
-        created_users = []
-        for user in users:
-            name = user.get('name')
-            email = user.get('email')
-
-            if not name or not isinstance(name, str):
-                continue
-            if not email or not isinstance(email, str) or '@' not in email:
-                continue
-
-            user_id = str(uuid.uuid4())
-            item = {
-                'id': user_id,
-                'name': name,
-                'email': email,
-            }
-            table.put_item(Item=item)
-            created_users.append(item)
+        # Send one message with all users
+        sqs.send_message(
+            QueueUrl=QUEUE_URL,
+            MessageBody=json.dumps(valid_users)
+        )
 
         return {
-            'statusCode': 201,
-            'body': json.dumps({'created_users': created_users})
+            "statusCode": 202,
+            "body": json.dumps({"message": f"{len(valid_users)} users queued for background processing"})
         }
     except (json.JSONDecodeError, KeyError, BotoCoreError) as exc:
         return {
