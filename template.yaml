@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: User API with Lambda, API Gateway, and DynamoDB
+Description: User API with Lambda, API Gateway, DynamoDB, and SQS-based async bulk processing
 
 Parameters:
   Environment:
@@ -27,7 +27,10 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-# IAM Role for all Lambda functions
+  UserInsertQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "UserInsertQueue-${Environment}"
 
   LambdaRole:
     Type: AWS::IAM::Role
@@ -41,7 +44,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: DynamoDBAccess
+        - PolicyName: AllLambdaPermissions
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -50,9 +53,10 @@ Resources:
                   - dynamodb:*
                   - logs:*
                   - cloudwatch:*
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
                 Resource: "*"
-
-### Lambda Functions
 
   CreateUserFunction:
     Type: AWS::Lambda::Function
@@ -74,16 +78,47 @@ Resources:
     Properties:
       FunctionName: !Sub "bulk_create_user-${Environment}"
       Runtime: python3.11
-      Handler: bulk_create_user.lambda_handler
+      Handler: index.lambda_handler
       Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref UserInsertQueue
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "Bulk Create Placeholder"}
+
+  WorkerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "worker_lambda-${Environment}"
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 60
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
       Code:
         ZipFile: |
           def lambda_handler(event, context):
-              return {"statusCode": 200, "body": "Bulk Create Placeholder"}
+              return {"statusCode": 200, "body": "placeholder"}
 
+  SQSInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt WorkerLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: sqs.amazonaws.com
+      SourceArn: !GetAtt UserInsertQueue.Arn
+
+  SQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: !GetAtt UserInsertQueue.Arn
+      FunctionName: !Ref WorkerLambda
+      Enabled: true
 
   GetUserFunction:
     Type: AWS::Lambda::Function
@@ -115,8 +150,6 @@ Resources:
         Variables:
           TABLE_NAME: !Ref UsersTable
 
-### API Gateway
-
   ApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -140,10 +173,9 @@ Resources:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref ApiGateway
-      ParentId: !Ref UserResource  # This means /user is the parent
-      PathPart: bulk               # So full path becomes /user/bulk
+      ParentId: !Ref UserResource
+      PathPart: bulk
 
-  ### API Methods
   PostUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -167,7 +199,6 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BulkCreateUsersFunction.Arn}/invocations"
-
 
   GetUserMethod:
     Type: AWS::ApiGateway::Method
@@ -193,8 +224,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUserFunction.Arn}/invocations"
 
-### Deployment + Stage
-
   Deployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -205,9 +234,6 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       StageName: !Ref Environment
-
-
-### Permissions for API Gateway to invoke Lambdas
 
   LambdaInvokePermissionsCreate:
     Type: AWS::Lambda::Permission
@@ -240,7 +266,6 @@ Resources:
       FunctionName: !Ref DeleteUserFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
-
 
 Outputs:
   ApiBaseURL:
