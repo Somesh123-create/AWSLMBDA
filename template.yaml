@@ -82,6 +82,7 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !Ref UserInsertQueue
+          TABLE_NAME: !Ref UsersTable
       Code:
         ZipFile: |
           def lambda_handler(event, context):
