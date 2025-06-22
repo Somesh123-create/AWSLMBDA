@@ -77,7 +77,7 @@ Resources:
     Properties:
       FunctionName: !Sub "bulk_create_user-${Environment}"
       Runtime: python3.11
-      Handler: index.lambda_handler
+      Handler: bulk_create_user.lambda_handler
       Role: !GetAtt LambdaRole.Arn
       Environment:
         Variables:
@@ -92,7 +92,7 @@ Resources:
     Properties:
       FunctionName: !Sub "worker_lambda-${Environment}"
       Runtime: python3.11
-      Handler: index.lambda_handler
+      Handler: worker_lambda.lambda_handler
       Role: !GetAtt LambdaRole.Arn
       Timeout: 60
       Environment:
