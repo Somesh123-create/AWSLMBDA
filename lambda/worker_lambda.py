@@ -1,4 +1,7 @@
-"""this module defines a Lambda function that processes messages from an SQS queue and inserts user data into a DynamoDB table."""
+"""
+this module defines a Lambda function that processes messages from an SQS queue and inserts user data into a DynamoDB table.
+this is SQL lambda worker that processes messages from an SQS queue and inserts user data into a DynamoDB table.
+"""
 import json
 import os
 import boto3
