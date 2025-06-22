@@ -169,7 +169,6 @@ Resources:
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BulkCreateUsersFunction.Arn}/invocations"
 
 
-
   GetUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:

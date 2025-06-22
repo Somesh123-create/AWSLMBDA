@@ -61,3 +61,10 @@ jobs:
             --zip-file "fileb://$zipfile" \
             --region ${{ env.AWS_REGION }}
         done
+
+    - name: Show API Base URL
+      run: |
+        aws cloudformation describe-stacks \
+          --stack-name ${{ env.STACK_NAME }} \
+          --query "Stacks[0].Outputs[?OutputKey=='ApiBaseURL'].OutputValue" \
+          --output text

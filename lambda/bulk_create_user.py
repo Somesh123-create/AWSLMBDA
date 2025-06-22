@@ -1,15 +1,18 @@
+"""Lambda function to bulk create users in DynamoDB."""
 import json
-import boto3
-import os
 import uuid
+import os
+import boto3
+
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
-def lambda_handler(event, context):
+def lambda_handler(event, _context):
+    """Handle bulk user creation from API Gateway event."""
     try:
-        print("Received event:", event)
-        body = json.loads(event.get('body', '{}'))
+        body = json.loads(event['body'])
+        print("Received body:", body)
         users = body.get('users', [])
         if not isinstance(users, list):
             print("Validation failed: 'users' is not a list")
@@ -46,8 +49,8 @@ def lambda_handler(event, context):
             'statusCode': 201,
             'body': json.dumps({'created_users': created_users})
         }
-    except Exception as e:
-        print(f"Error occurred: {e}")
+    except (json.JSONDecodeError, KeyError, boto3.exceptions.Boto3Error) as e:
+        print(f"Unexpected error: {e}")
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})
