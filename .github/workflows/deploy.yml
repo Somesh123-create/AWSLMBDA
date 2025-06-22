@@ -48,6 +48,7 @@ jobs:
           --capabilities CAPABILITY_NAMED_IAM \
           --no-fail-on-empty-changeset \
           --parameter-overrides Environment=${{ env.ENV_SUFFIX }}
+          --region ${{ env.AWS_REGION }}
 
     - name: Update All Lambda Functions
       run: |

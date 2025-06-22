@@ -53,9 +53,7 @@ Resources:
                   - dynamodb:*
                   - logs:*
                   - cloudwatch:*
-                  - sqs:SendMessage
-                  - sqs:ReceiveMessage
-                  - sqs:DeleteMessage
+                  - sqs:*
                 Resource: "*"
 
   CreateUserFunction:
