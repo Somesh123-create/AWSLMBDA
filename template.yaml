@@ -191,6 +191,13 @@ Resources:
       ParentId: !Ref UserResource
       PathPart: bulk
 
+  ParallelUserResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref UserResource
+      PathPart: parallel
+
   PostUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -207,7 +214,7 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGateway
-      ResourceId: !Ref UserResource
+      ResourceId: !Ref ParallelUserResource
       HttpMethod: POST
       AuthorizationType: NONE
       Integration:
