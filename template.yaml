@@ -72,6 +72,21 @@ Resources:
         Variables:
           TABLE_NAME: !Ref UsersTable
 
+  ParallelProcessingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "parallel_task-${Environment}"
+      Runtime: python3.11
+      Handler: parallel_task.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref UsersTable
+
   BulkCreateUsersFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -188,6 +203,18 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateUserFunction.Arn}/invocations"
 
+  ParallelProcessMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref UserResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParallelProcessingFunction.Arn}/invocations"
+
   BulkUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -240,6 +267,14 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref CreateUserFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
+
+  LambdaInvokePermissionsCreateParallel:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ParallelProcessingFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
 
