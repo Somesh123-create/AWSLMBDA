@@ -87,6 +87,22 @@ Resources:
         Variables:
           TABLE_NAME: !Ref UsersTable
 
+  ProcessingProcessFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "multi_process-${Environment}"
+      Runtime: python3.11
+      Handler: multi_process.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref UsersTable
+
+
   BulkCreateUsersFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -198,6 +214,13 @@ Resources:
       ParentId: !Ref UserResource
       PathPart: parallel
 
+  ParallelProcessUserResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref UserResource
+      PathPart: parallel_process
+
   PostUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -221,6 +244,20 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParallelProcessingFunction.Arn}/invocations"
+
+  
+  ParallelProcessFuncMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ParallelProcessUserResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProcessingProcessFunction.Arn}/invocations"
+
 
   BulkUserMethod:
     Type: AWS::ApiGateway::Method
@@ -282,6 +319,14 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref ParallelProcessingFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
+
+  LambdaInvokePermissionsCreateParallelFunc:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ProcessingProcessFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
 
