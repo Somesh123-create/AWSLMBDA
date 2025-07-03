@@ -1,38 +1,42 @@
-"""
-This Lambda function processes a list of user records in parallel, inserting them into a DynamoDB table in batches.
-It uses threading to handle multiple batches concurrently, improving performance for large datasets.
-"""
-
 import json
 import os
 import uuid
 import threading
+import time
 import boto3
 
 # DynamoDB table setup
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])  # Set this in Lambda environment
 
-
+# Split data into chunks
 def chunk_data(data, batch_size=10):
-    """Splits the input data into chunks of specified batch size."""
     for i in range(0, len(data), batch_size):
         yield data[i:i + batch_size]
 
-def insert_batch(batch):
-    """Inserts a batch of items into the DynamoDB table."""
+# Thread-safe print lock
+print_lock = threading.Lock()
+
+# Insert a batch of items into DynamoDB with logging
+def insert_batch(batch, thread_id):
+    start_time = time.time()
     with table.batch_writer() as writer:
         for item in batch:
             if "id" not in item:
                 item["id"] = str(uuid.uuid4())
             writer.put_item(Item=item)
-    print(f"✅ Inserted batch of {len(batch)} items.")
 
+    duration = time.time() - start_time
+    with print_lock:
+        print(f"🧵 Thread {thread_id} inserted {len(batch)} items in {duration:.2f} seconds.")
+        print(f"🧵 Thread {thread_id} data: {json.dumps(batch)}")
 
+# Lambda handler
 def lambda_handler(event, _context):
-    """AWS Lambda handler to process user records in parallel."""
     try:
-        # Parse body
+        lambda_start = time.time()
+
+        # Parse input
         body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
         items = body.get("users", [])
 
@@ -42,16 +46,19 @@ def lambda_handler(event, _context):
                 "body": json.dumps("Missing or invalid 'users' list")
             }
 
-        # Split into batches of 10 and use threading
+        # Create and start threads for each batch
         threads = []
-        for batch in chunk_data(items, batch_size=10):
-            thread = threading.Thread(target=insert_batch, args=(batch,))
+        for i, batch in enumerate(chunk_data(items, batch_size=10)):
+            thread = threading.Thread(target=insert_batch, args=(batch, i + 1), name=f"BatchThread-{i+1}")
             threads.append(thread)
             thread.start()
 
         # Wait for all threads to complete
         for thread in threads:
             thread.join()
+
+        total_time = time.time() - lambda_start
+        print(f"⏱️ Lambda total time taken: {total_time:.2f} seconds.")
 
         return {
             "statusCode": 200,
@@ -60,7 +67,7 @@ def lambda_handler(event, _context):
         }
 
     except Exception as e:
-        print("Error:", str(e))
+        print("❌ Error:", str(e))
         return {
             "statusCode": 500,
             "body": json.dumps(f"Error: {str(e)}")
