@@ -7,8 +7,8 @@ Environment Variables:
     TABLE_NAME: The name of the DynamoDB table from which users will be deleted.
 """
 import os
-from multiprocessing import Process, Queue, cpu_count
-from mylib.utils import my_function
+from multiprocessing import Process, Pipe
+from mylib.utils import my_function_ml_procs
 import boto3
 
 
@@ -19,22 +19,33 @@ table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def run_parallel_with_processes(numbers: list) -> list:
     processes = []
-    output_queue = Queue()
+    conns = []
 
-    max_workers = min(len(numbers), cpu_count())
-    print(f"Using up to {max_workers} processes.")
+    print(f"Creating {len(numbers)} processes...")
 
     for num in numbers:
-        p = Process(target=my_function, args=(num, output_queue))
-        processes.append(p)
+        parent_conn, child_conn = Pipe()
+        p = Process(target=my_function_ml_procs, args=(num, child_conn))
+        processes.append((p, parent_conn))
+        conns.append(parent_conn)
         p.start()
 
-    for p in processes:
-        p.join()
-
     results = []
-    while not output_queue.empty():
-        results.append(output_queue.get())
+
+    for (p, conn) in processes:
+        p.join(timeout=30)  # wait 30 seconds
+        if p.is_alive():
+            p.terminate()
+            results.append({"error": f"Process {p.pid} timed out"})
+        else:
+            try:
+                if conn.poll():
+                    results.append(conn.recv())
+                else:
+                    results.append({"error": f"No data received from process {p.pid}"})
+            except Exception as e:
+                results.append({"error": f"Exception while receiving from process {p.pid}: {str(e)}"})
+        conn.close()
 
     return results
 

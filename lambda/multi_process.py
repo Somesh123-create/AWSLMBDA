@@ -2,52 +2,42 @@ import json
 import os
 import uuid
 import time
-import asyncio
-import aioboto3
+import boto3
+from multiprocessing import Process, Pipe
 
-# Table name from environment
-TABLE_NAME = os.environ['TABLE_NAME']
 
 # Split data into chunks
 def chunk_data(data, batch_size=10):
     for i in range(0, len(data), batch_size):
         yield data[i:i + batch_size]
 
-# Async worker function to write a batch to DynamoDB
-async def insert_batch(batch, batch_id):
+# Worker function run in a separate process
+def insert_batch(batch, conn, process_id):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(os.environ['TABLE_NAME'])
+    
     start_time = time.time()
     try:
-        session = aioboto3.Session()
-        async with session.resource('dynamodb') as dynamodb:
-            table = await dynamodb.Table(TABLE_NAME)
-            async with table.batch_writer() as writer:
-                for item in batch:
-                    if "id" not in item:
-                        item["id"] = str(uuid.uuid4())
-                    await writer.put_item(Item=item)
+        with table.batch_writer() as writer:
+            for item in batch:
+                if "id" not in item:
+                    item["id"] = str(uuid.uuid4())
+                writer.put_item(Item=item)
 
         duration = time.time() - start_time
-        return {
-            "batch_id": batch_id,
+        log = {
+            "process_id": process_id,
             "count": len(batch),
             "duration": round(duration, 2),
-            "status": "success"
+            "data": batch
         }
+        conn.send(log)
     except Exception as e:
-        return {
-            "batch_id": batch_id,
-            "error": str(e)
-        }
+        conn.send({"process_id": process_id, "error": str(e)})
+    finally:
+        conn.close()
 
-# Async entry point
-async def process_all_batches(items):
-    tasks = [
-        insert_batch(batch, i + 1)
-        for i, batch in enumerate(chunk_data(items, batch_size=10))
-    ]
-    return await asyncio.gather(*tasks)
-
-# Lambda entry point
+# Lambda handler
 def lambda_handler(event, _context):
     try:
         lambda_start = time.time()
@@ -61,18 +51,39 @@ def lambda_handler(event, _context):
                 "body": json.dumps("Missing or invalid 'users' list")
             }
 
-        logs = asyncio.run(process_all_batches(items))
+        # Split and start processes
+        processes = []
+        pipes = []
+        for i, batch in enumerate(chunk_data(items, batch_size=10)):
+            parent_conn, child_conn = Pipe()
+            p = Process(target=insert_batch, args=(batch, child_conn, i + 1))
+            p.start()
+            processes.append((p, parent_conn))
+
+        logs = []
+
+        # Join all processes and collect logs
+        for p, conn in processes:
+            p.join(timeout=30)
+            if p.is_alive():
+                p.terminate()
+                logs.append({"error": f"Process {p.name} timed out"})
+            elif conn.poll():
+                logs.append(conn.recv())
+            else:
+                logs.append({"error": f"No response from {p.name}"})
 
         total_time = time.time() - lambda_start
         print(f"⏱️ Lambda total time taken: {round(total_time, 2)} seconds.")
+
         for log in logs:
-            print(f"🧩 Async Batch Log: {json.dumps(log)}")
+            print(f"🧩 Process Log: {json.dumps(log)}")
 
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
-                "message": "All items processed using asyncio",
+                "message": "All items processed (locally or EC2 only)",
                 "logs": logs,
                 "total_time_sec": round(total_time, 2)
             })
