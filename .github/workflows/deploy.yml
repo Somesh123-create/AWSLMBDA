@@ -40,21 +40,16 @@ jobs:
         python-version: '3.11'
 
     
-    - name: Create Virtualenv and Install Dependencies
-      run: |
-        python3.11 -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Build Lambda Layer from Virtualenv
+    - name: Install Dependencies into Lambda Layer Directory
       run: |
         mkdir -p layer/python
-        cp -r venv/lib/python3.11/site-packages/* layer/python/
+        pip install --upgrade pip
+        pip install -r requirements.txt -t layer/python
         cd layer
         zip -r ../python-libs-layer.zip .
         cd ..
 
+   
     - name: Publish Lambda Layer
       id: publish_layer
       run: |
