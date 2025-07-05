@@ -31,6 +31,32 @@ jobs:
           fname=$(basename "$file" .py)
           zip -j "zipped/${fname}.zip" "$file"
         done
+    
+    - name: Create Virtualenv and Install Dependencies
+      run: |
+        python3.11 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Build Lambda Layer from Virtualenv
+      run: |
+        mkdir -p layer/python
+        cp -r venv/lib/python3.11/site-packages/* layer/python/
+        cd layer
+        zip -r ../python-libs-layer.zip .
+        cd ..
+
+    - name: Publish Lambda Layer
+      id: publish_layer
+      run: |
+        LAYER_ARN=$(aws lambda publish-layer-version \
+          --layer-name python-libs-layer-${{ env.ENV_SUFFIX }} \
+          --compatible-runtimes python3.11 \
+          --zip-file fileb://python-libs-layer.zip \
+          --region ${{ env.AWS_REGION }} \
+          --query 'LayerVersionArn' --output text)
+        echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_ENV
 
     - name: Delete failed stack if exists
       run: |
@@ -62,6 +88,19 @@ jobs:
             --zip-file "fileb://$zipfile" \
             --region ${{ env.AWS_REGION }}
         done
+    
+    - name: Attach Latest Layer to Functions
+      run: |
+        for zipfile in zipped/*.zip; do
+          fname=$(basename "$zipfile" .zip)
+          func="${fname}-${{ env.ENV_SUFFIX }}"
+          echo "🔄 Attaching layer to: $func"
+          aws lambda update-function-configuration \
+            --function-name "$func" \
+            --layers "${{ env.LAYER_ARN }}" \
+            --region ${{ env.AWS_REGION }}
+        done
+
 
     - name: Show API Base URL
       run: |
