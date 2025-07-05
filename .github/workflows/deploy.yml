@@ -23,7 +23,8 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-
+    
+  
     - name: Zip All Lambda Functions
       run: |
         mkdir -p zipped
@@ -31,6 +32,13 @@ jobs:
           fname=$(basename "$file" .py)
           zip -j "zipped/${fname}.zip" "$file"
         done
+    
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
     
     - name: Create Virtualenv and Install Dependencies
       run: |
