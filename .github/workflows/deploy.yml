@@ -50,16 +50,35 @@ jobs:
         cd ..
 
    
-    - name: Publish Lambda Layer
-      id: publish_layer
+    - name: Publish Lambda Layer (Dependencies)
+      id: publish_layer1
       run: |
-        LAYER_ARN=$(aws lambda publish-layer-version \
+        LAYER1_ARN=$(aws lambda publish-layer-version \
           --layer-name python-libs-layer-${{ env.ENV_SUFFIX }} \
           --compatible-runtimes python3.11 \
           --zip-file fileb://python-libs-layer.zip \
           --region ${{ env.AWS_REGION }} \
           --query 'LayerVersionArn' --output text)
-        echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_ENV
+        echo "LAYER1_ARN=$LAYER1_ARN" >> $GITHUB_ENV
+
+    - name: Create Shared Layer with Custom Logic
+      run: |
+        mkdir -p layer/python
+        cp -r shared/mylib layer/python/
+        cd layer
+        zip -r ../shared-layer.zip .
+        cd ..
+    
+    - name: Publish Shared Logic Layer
+      id: publish_layer2
+      run: |
+        LAYER2_ARN=$(aws lambda publish-layer-version \
+          --layer-name shared-logic-layer-${{ env.ENV_SUFFIX }} \
+          --compatible-runtimes python3.11 \
+          --zip-file fileb://shared-layer.zip \
+          --region ${{ env.AWS_REGION }} \
+          --query 'LayerVersionArn' --output text)
+        echo "LAYER2_ARN=$LAYER2_ARN" >> $GITHUB_ENV
 
     - name: Delete failed stack if exists
       run: |
@@ -100,7 +119,7 @@ jobs:
           echo "🔄 Attaching layer to: $func"
           aws lambda update-function-configuration \
             --function-name "$func" \
-            --layers "${{ env.LAYER_ARN }}" \
+            --layers "${{ env.LAYER1_ARN }}" "${{ env.LAYER2_ARN }}" \
             --region ${{ env.AWS_REGION }}
         done
 
