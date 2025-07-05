@@ -46,7 +46,7 @@ def lambda_handler(event, _context):
                 "body": json.dumps("Missing or invalid 'users' list")
             }
 
-        # Create and start threads for each batch
+        #Create and start threads for each batch
         threads = []
         for i, batch in enumerate(chunk_data(items, batch_size=10)):
             thread = threading.Thread(target=insert_batch, args=(batch, i + 1), name=f"BatchThread-{i+1}")
