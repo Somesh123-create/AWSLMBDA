@@ -15,13 +15,40 @@ Dependencies:
 """
 import json
 import os
+import requests
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from mylib.utils import my_function
+import threading
+from queue import Queue
+
 
 def lambda_handler(event: dict, _context: dict) -> dict:
     """
     AWS Lambda handler to get a user by ID from DynamoDB.
     """
+    _thread = []
+    output_queue = Queue()
+    
+
+    my_number = [i for i in range(2, 101, 2)]
+    
+    for num in my_number:
+        thread = threading.Thread(target=my_function, args=(num, output_queue))
+        _thread.append(thread)
+        thread.start()
+        
+    for thread in _thread:
+        thread.join()
+    
+    thread_results = []
+    while not output_queue.empty():
+        num, result = output_queue.get()
+        print(f"Finished processing number {num}, result: {result}")
+        thread_results.append((num, result))
+        
+    print(f"Thread results: {thread_results}")
+
     try:
         table_name = os.environ['TABLE_NAME']
     except KeyError:
