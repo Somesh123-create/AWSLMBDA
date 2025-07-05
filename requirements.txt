@@ -1,8 +1,1 @@
-boto3
-botocore
-jmespath
-python-dateutil
-s3transfer
-six
-urllib3
 pandas
