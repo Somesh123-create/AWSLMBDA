@@ -13,7 +13,7 @@ Resources:
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "Users-${Environment}"
+      TableName: !Sub "UsersV2-${Environment}"
       AttributeDefinitions:
         - AttributeName: userId
           AttributeType: S
