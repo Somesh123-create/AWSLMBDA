@@ -5,6 +5,7 @@ import threading
 import time
 import boto3
 
+
 # DynamoDB table setup
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])  # Set this in Lambda environment

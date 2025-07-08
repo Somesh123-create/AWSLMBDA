@@ -15,17 +15,23 @@ Resources:
     Properties:
       TableName: !Sub "Users-${Environment}"
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: recordTypeId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
-          KeyType: HASH
+        - AttributeName: userId
+          KeyType: HASH      # Partition Key
+        - AttributeName: recordTypeId
+          KeyType: RANGE     # Sort Key
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
       Tags:
         - Key: Environment
           Value: !Ref Environment
+        - Key: Name
+          Value: !Sub "Users-${Environment}"
 
   UserInsertQueue:
     Type: AWS::SQS::Queue
