@@ -91,12 +91,6 @@ jobs:
           aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }}
         fi
     
-    - name: Upload all Glue scripts to S3
-      run: |
-        chmod +x ./upload-glue-script.sh
-        ./upload-glue-script.sh
-
-        
     - name: Deploy Infrastructure via CloudFormation
       run: |
         aws cloudformation deploy \
@@ -106,7 +100,13 @@ jobs:
           --no-fail-on-empty-changeset \
           --parameter-overrides Environment=${{ env.ENV_SUFFIX }} \
           --region  ${{ env.AWS_REGION }}
-
+    
+    - name: Upload all Glue scripts to S3
+      run: |
+        chmod +x ./upload-glue-script.sh
+        ./upload-glue-script.sh
+        echo "Glue scripts uploaded successfully."
+        
     - name: Update All Lambda Functions
       run: |
         for zipfile in zipped/*.zip; do
