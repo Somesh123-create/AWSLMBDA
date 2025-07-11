@@ -31,7 +31,6 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-
   UserInsertQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -106,7 +105,6 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
-
 
   BulkCreateUsersFunction:
     Type: AWS::Lambda::Function
@@ -250,7 +248,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ParallelProcessingFunction.Arn}/invocations"
 
-  
   ParallelProcessFuncMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -262,7 +259,6 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProcessingProcessFunction.Arn}/invocations"
-
 
   BulkUserMethod:
     Type: AWS::ApiGateway::Method
@@ -307,6 +303,8 @@ Resources:
       - GetUserMethod
       - DeleteUserMethod
       - BulkUserMethod
+      - ParallelProcessMethod
+      - ParallelProcessFuncMethod
     Properties:
       RestApiId: !Ref ApiGateway
       StageName: !Ref Environment
@@ -359,6 +357,62 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
 
+  GlueScriptBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}"
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "GlueJobRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}"
+                  - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/*"
+  
+  UserETLGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "user-etl-job-${Environment}"
+      Role: !GetAtt GlueJobRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-scripts/user_etl.py"
+        PythonVersion: 3
+      DefaultArguments:
+        "--TempDir": !Sub "s3://glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-temp/"
+        "--job-language": "python"
+        "--enable-metrics": "true"
+        "--ENVIRONMENT": !Ref Environment
+      GlueVersion: "4.0"
+      MaxCapacity: 5
+      Timeout: 60
+      MaxRetries: 2
+
 Outputs:
   ApiBaseURL:
     Description: "Base URL"
@@ -367,3 +421,11 @@ Outputs:
   LambdaExecutionRole:
     Description: "Lambda Role ARN"
     Value: !GetAtt LambdaRole.Arn
+
+  GlueJobName:
+    Description: Name of the Glue job
+    Value: !Ref UserETLGlueJob
+
+  GlueBucketName:
+    Description: Bucket used for Glue script and temp storage
+    Value: !Ref GlueScriptBucket
