@@ -393,7 +393,22 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}"
                   - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/*"
-  
+        
+        - PolicyName: GlueJobManagement
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:CreateJob
+                  - glue:ListJobs
+                  - glue:DeleteJob
+                  - glue:GetJob
+                  - glue:UpdateJob
+                  - glue:StartJobRun
+                  - glue:GetJobRun
+                Resource: "*"
+
   UserETLGlueJob:
     Type: AWS::Glue::Job
     Properties:
