@@ -391,8 +391,8 @@ Resources:
                   - s3:PutObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}"
-                  - !Sub "arn:aws:s3:::glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/*"
+                  - !Sub "arn:aws:s3:::glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}"
+                  - !Sub "arn:aws:s3:::glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}/*"
         
         - PolicyName: GlueJobManagement
           PolicyDocument:
@@ -416,10 +416,10 @@ Resources:
       Role: !GetAtt GlueJobRole.Arn
       Command:
         Name: glueetl
-        ScriptLocation: !Sub "s3://glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-scripts/user_etl.py"
+        ScriptLocation: !Sub "s3://glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-scripts/user_etl.py"
         PythonVersion: 3
       DefaultArguments:
-        "--TempDir": !Sub "s3://glue-script-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-temp/"
+        "--TempDir": !Sub "s3://glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}/glue-temp/"
         "--job-language": "python"
         "--enable-metrics": "true"
         "--ENVIRONMENT": !Ref Environment
