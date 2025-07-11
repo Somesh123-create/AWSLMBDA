@@ -90,7 +90,13 @@ jobs:
           aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }}
           aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }}
         fi
+    
+    - name: Upload all Glue scripts to S3
+      run: |
+        chmod +x ./upload-glue-script.sh
+        ./upload-glue-script.sh
 
+        
     - name: Deploy Infrastructure via CloudFormation
       run: |
         aws cloudformation deploy \
