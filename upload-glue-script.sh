@@ -8,6 +8,7 @@ REGION=${AWS_REGION:-us-east-2}
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="glue-scripts-${ENVIRONMENT}-${ACCOUNT_ID}-${REGION}"
 
+
 # Set local directory and remote prefix
 LOCAL_DIR="./glue-jobs"
 REMOTE_PREFIX="glue-scripts"
