@@ -423,6 +423,7 @@ Resources:
         "--job-language": "python"
         "--enable-metrics": "true"
         "--ENVIRONMENT": !Ref Environment
+        "--TABLE_NAME": !Ref UsersTable
       GlueVersion: "4.0"
       MaxCapacity: 5
       Timeout: 60
