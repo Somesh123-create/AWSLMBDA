@@ -474,7 +474,7 @@ Resources:
                   - !GetAtt UsersTable.Arn
                   - !GetAtt UsersDataEntryTable.Arn
                   - !GetAtt UsersDataEntryVersionTable.Arn
-                  
+
 # Glue Job
   UserETLGlueJob:
     Type: AWS::Glue::Job
@@ -496,7 +496,7 @@ Resources:
       GlueVersion: "4.0"
       MaxCapacity: 5
       Timeout: 60
-      MaxRetries: 2
+      MaxConcurrentRuns: 5
 
 # Outputs
 Outputs:
