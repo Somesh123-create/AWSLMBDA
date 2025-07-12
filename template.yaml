@@ -496,8 +496,7 @@ Resources:
       GlueVersion: "4.0"
       MaxCapacity: 5
       Timeout: 60
-      MaxConcurrentRuns: 5
-
+      
 # Outputs
 Outputs:
   ApiBaseURL:
