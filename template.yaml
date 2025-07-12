@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: User API with Lambda, API Gateway, DynamoDB, and SQS-based async bulk processing
 
 Parameters:
@@ -9,7 +9,7 @@ Parameters:
     Description: Environment name (e.g., dev, prod, staging)
 
 Resources:
-
+# DynamoDB Tables
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -21,9 +21,9 @@ Resources:
           AttributeType: S
       KeySchema:
         - AttributeName: userId
-          KeyType: HASH      # Partition Key
+          KeyType: HASH # Partition Key
         - AttributeName: recordTypeId
-          KeyType: RANGE     # Sort Key
+          KeyType: RANGE # Sort Key
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
@@ -31,6 +31,28 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  UsersDataEntryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "UsersDataEntry-${Environment}"
+      AttributeDefinitions:
+        - AttributeName: ddw_key
+          AttributeType: S
+        - AttributeName: tab_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ddw_key
+          KeyType: HASH # Partition Key
+        - AttributeName: tab_name
+          KeyType: RANGE # Sort Key
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+# Permissions
   UserInsertQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -61,6 +83,23 @@ Resources:
                   - sqs:*
                 Resource: "*"
 
+  SQSInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt WorkerLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: sqs.amazonaws.com
+      SourceArn: !GetAtt UserInsertQueue.Arn
+
+  SQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: !GetAtt UserInsertQueue.Arn
+      FunctionName: !Ref WorkerLambda
+      Enabled: true
+
+# Lambda Functions
   CreateUserFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -138,22 +177,6 @@ Resources:
           def lambda_handler(event, context):
               return {"statusCode": 200, "body": "placeholder"}
 
-  SQSInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt WorkerLambda.Arn
-      Action: lambda:InvokeFunction
-      Principal: sqs.amazonaws.com
-      SourceArn: !GetAtt UserInsertQueue.Arn
-
-  SQSTrigger:
-    Type: AWS::Lambda::EventSourceMapping
-    Properties:
-      BatchSize: 1
-      EventSourceArn: !GetAtt UserInsertQueue.Arn
-      FunctionName: !Ref WorkerLambda
-      Enabled: true
-
   GetUserFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -184,6 +207,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref UsersTable
 
+# API Gateway Resources  
   ApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -224,6 +248,7 @@ Resources:
       ParentId: !Ref UserResource
       PathPart: parallel_process
 
+# API Gateway Methods
   PostUserMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -296,6 +321,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUserFunction.Arn}/invocations"
 
+# API Gateway Deployment
   Deployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -309,6 +335,7 @@ Resources:
       RestApiId: !Ref ApiGateway
       StageName: !Ref Environment
 
+# Lambda Permissions
   LambdaInvokePermissionsCreate:
     Type: AWS::Lambda::Permission
     Properties:
@@ -357,6 +384,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*"
 
+# Glue Resources
   GlueScriptBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -367,6 +395,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+# Glue Job Role
   GlueJobRole:
     Type: AWS::IAM::Role
     Properties:
@@ -393,7 +422,7 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}"
                   - !Sub "arn:aws:s3:::glue-scripts-${Environment}-${AWS::AccountId}-${AWS::Region}/*"
-        
+
         - PolicyName: GlueJobManagement
           PolicyDocument:
             Version: "2012-10-17"
@@ -409,6 +438,7 @@ Resources:
                   - glue:GetJobRun
                 Resource: "*"
 
+# Glue Job
   UserETLGlueJob:
     Type: AWS::Glue::Job
     Properties:
@@ -429,6 +459,7 @@ Resources:
       Timeout: 60
       MaxRetries: 2
 
+# Outputs
 Outputs:
   ApiBaseURL:
     Description: "Base URL"
