@@ -7,6 +7,7 @@ Optimized for I/O-bound workloads.
 """
 
 import sys
+import time
 import logging
 import threading
 
@@ -77,19 +78,36 @@ def transform_item(item):
     }
 
 
-def write_batch_thread(table_resource, items, batch_number):
+def write_batch_thread(table_resource, items, batch_number, max_retries=5):
     """Threaded batch writer using boto3 resource batch_writer() with composite key."""
     logger.info("⏳ Writing Batch #%d with %d items...", batch_number, len(items))
     try:
         with table_resource.batch_writer(overwrite_by_pkeys=['ddw_key', 'tab_name']) as batch:
             for item in items:
-                batch.put_item(Item=item)
+                for attempt in range(max_retries):
+                    try:
+                        batch.put_item(Item=item)
+                        break  # Success
+                    except (
+                        botocore.exceptions.BotoCoreError,
+                        botocore.exceptions.ClientError,
+                        ValueError,
+                        TypeError
+                    ) as e:
+                        wait_time = 2 ** attempt
+                        logger.warning(
+                            "⚠️ Retry %d for item due to: %s. Waiting %.2fs",
+                            attempt + 1, str(e), wait_time
+                        )
+                        time.sleep(wait_time)
+
+        logger.info("✅ Batch #%d completed.", batch_number)
     except botocore.exceptions.BotoCoreError as e:
         logger.error("❌ BotoCoreError in Batch #%d: %s", batch_number, str(e))
     except botocore.exceptions.ClientError as e:
         logger.error("❌ ClientError in Batch #%d: %s", batch_number, str(e))
-
-
+    except (ValueError, TypeError) as e:
+        logger.error("❌ Data error in Batch #%d: %s", batch_number, str(e))
 
 def scan_and_copy():
     """Scan source table and copy items to target table in batches using threads."""
