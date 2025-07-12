@@ -15,12 +15,12 @@ Resources:
     Properties:
       TableName: !Sub "UsersV2-${Environment}"
       AttributeDefinitions:
-        - AttributeName: userId
+        - AttributeName: ddw_key
           AttributeType: S
         - AttributeName: recordTypeId
           AttributeType: S
       KeySchema:
-        - AttributeName: userId
+        - AttributeName: ddw_key
           KeyType: HASH # Partition Key
         - AttributeName: recordTypeId
           KeyType: RANGE # Sort Key
@@ -44,6 +44,27 @@ Resources:
         - AttributeName: ddw_key
           KeyType: HASH # Partition Key
         - AttributeName: tab_name
+          KeyType: RANGE # Sort Key
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  UsersDataEntryVersionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "UsersDataEntryVersion-${Environment}"
+      AttributeDefinitions:
+        - AttributeName: ddw_key
+          AttributeType: S
+        - AttributeName: version_number
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ddw_key
+          KeyType: HASH # Composite key: ddw_key#tab_name
+        - AttributeName: version_number
           KeyType: RANGE # Sort Key
       ProvisionedThroughput:
         ReadCapacityUnits: 5
