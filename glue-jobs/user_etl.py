@@ -12,7 +12,7 @@ import threading
 
 # Constants
 NUM_WORKER_THREADS = 5
-ARG_KEYS = ['ENVIRONMENT', 'TABLE_NAME']
+ARG_KEYS = ['ENVIRONMENT', 'SOURCE_TABLE_NAME', 'USER_DATA_ENTRY_TABLE_NAME', 'USER_DATA_ENTRY_VERSION_TABLE_NAME']
 
 # Configure logging
 logging.basicConfig(
