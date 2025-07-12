@@ -474,7 +474,9 @@ Resources:
         "--job-language": "python"
         "--enable-metrics": "true"
         "--ENVIRONMENT": !Ref Environment
-        "--TABLE_NAME": !Ref UsersTable
+        "--SOURCE_TABLE_NAME": !Ref UsersTable
+        "--USER_DATA_ENTRY_TABLE_NAME": !Ref UsersDataEntryTable
+        "--USER_DATA_ENTRY_VERSION_TABLE_NAME": !Ref UsersDataEntryVersionTable
       GlueVersion: "4.0"
       MaxCapacity: 5
       Timeout: 60
