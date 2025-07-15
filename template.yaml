@@ -267,13 +267,13 @@ Resources:
           TABLE_NAME: !Ref UsersTable
       
   DDBStreamToLambdaMapping:
-  Type: AWS::Lambda::EventSourceMapping
-  Properties:
-    BatchSize: 100
-    StartingPosition: LATEST
-    EventSourceArn: !GetAtt UsersDataEntryTable.StreamArn
-    FunctionName: !Ref DDBEventHandlerFunction
-    Enabled: true
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 100
+      StartingPosition: LATEST
+      EventSourceArn: !GetAtt UsersDataEntryTable.StreamArn
+      FunctionName: !Ref DDBEventHandlerFunction
+      Enabled: true
 
 # API Gateway Resources  
   ApiGateway:
