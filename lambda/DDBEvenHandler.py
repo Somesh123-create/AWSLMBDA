@@ -1,4 +1,5 @@
 import json
+import threading
 import logging
 from functools import wraps
 from boto3.dynamodb.types import TypeDeserializer
@@ -147,3 +148,48 @@ def lambda_handler(event, context):
         logger.error("Error: %s", e)
         logger.info('-' * 38)
         return "Error"
+
+
+# @log_event_handler
+# def lambda_handler(event, context):
+#     logger.info("📦 Received event: %s", json.dumps(event))
+#     logger.info('-' * 38)
+
+#     threads = []
+
+#     try:
+#         for record in event.get('Records', []):
+#             event_name = record.get('eventName')
+
+#             def process(record=record, event_name=event_name):  # default args to capture values
+#                 with event_processing(event_name):
+#                     if event_name == 'INSERT':
+#                         handle_insert(record)
+#                     elif event_name == 'MODIFY':
+#                         handle_modify(record)
+#                     elif event_name == 'REMOVE':
+#                         handle_remove(record)
+#                     else:
+#                         logger.warning("Event '%s' not handled", event_name)
+
+#             thread = threading.Thread(target=process)
+#             thread.start()
+#             threads.append(thread)
+
+#         # Wait for all threads to complete
+#         for thread in threads:
+#             thread.join()
+
+#         logger.info('-' * 38)
+#         return {
+#             "statusCode": 200,
+#             "body": json.dumps({"message": "Stream processing completed", "recordsProcessed": len(threads)})
+#         }
+
+#     except Exception as e:
+#         logger.error("Error: %s", e)
+#         logger.info('-' * 38)
+#         return {
+#             "statusCode": 500,
+#             "body": json.dumps({"message": "Error during stream processing"})
+#         }
