@@ -265,13 +265,15 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
-      Events:
-          DynamoDBStream:
-            Type: DynamoDB
-            Properties:
-              Stream: !GetAtt UsersDataEntryTable.StreamArn
-              StartingPosition: LATEST
-              BatchSize: 100
+      
+    DDBStreamToLambdaMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 100
+      StartingPosition: LATEST
+      EventSourceArn: !GetAtt UsersDataEntryTable.StreamArn
+      FunctionName: !Ref DDBEventHandlerFunction
+      Enabled: true
 
 # API Gateway Resources  
   ApiGateway:
