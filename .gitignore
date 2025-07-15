@@ -196,3 +196,5 @@ cython_debug/
 # Virtual environments
 lam_env
 temple_bk.yaml
+test.json
+testcode.py

@@ -48,6 +48,8 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -102,6 +104,27 @@ Resources:
                   - logs:*
                   - cloudwatch:*
                   - sqs:*
+                Resource: "*"
+
+        - PolicyName: LambdaDynamoDBStreamPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:DescribeStream
+                  - dynamodb:ListStreams
+                  - dynamodb:CreateLogGroup
+                  - dynamodb:CreateLogStream
+                  - dynamodb:PutLogEvents
+                Resource: !GetAtt UsersDataEntryTable.StreamArn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
                 Resource: "*"
 
   SQSInvokePermission:
@@ -227,6 +250,28 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref UsersTable
+
+  DDBEventHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "DDBEvenHandler-${Environment}"
+      Runtime: python3.11
+      Handler: DDBEvenHandler.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref UsersTable
+    Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt UsersDataEntryTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 100
 
 # API Gateway Resources  
   ApiGateway:
